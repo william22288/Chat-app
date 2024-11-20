@@ -97,6 +97,20 @@
             callButton.disabled = true;
             hangupButton.disabled = false;
 
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then((stream) => {
+            // Do something with the stream
+            console.log("Access granted to media devices:", stream);
+        })
+        .catch((error) => {
+            console.error("Error accessing media devices:", error);
+        });
+} else {
+    console.error("getUserMedia is not supported in this browser.");
+}
+
+
             localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             localVideo.srcObject = localStream;
 
