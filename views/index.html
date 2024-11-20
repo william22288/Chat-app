@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .chat-message {
+            margin-bottom: 10px;
+        }
+        .message-header {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .message-body {
+            padding-left: 15px;
+        }
+        #localVideo, #remoteVideo {
+            width: 45%;
+            height: auto;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container">
+        <div class="row justify-content-center align-items-center vh-100">
+            <div class="col-md-8">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h1 class="card-title text-center mb-4">Chat</h1>
+                        <ul id="messages" class="list-unstyled"></ul>
+                        <form id="form" action="" class="d-flex">
+                            <input type="text" id="input" class="form-control" autocomplete="off" placeholder="Type a message..." required>
+                            <button class="btn btn-primary ms-2" type="submit">Send</button>
+                        </form>
+                        <button id="callButton" class="btn btn-success mt-3">Start Call</button>
+                        <button id="hangupButton" class="btn btn-danger mt-3" disabled>Hang Up</button>
+                        <video id="localVideo" autoplay muted></video>
+                        <video id="remoteVideo" autoplay></video>
+                    </div>
+                </div>
+                <button class="btn btn-outline-secondary mt-3" onclick="window.location.href='/tan/logout'">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        const username = '<%= username %>'; // EJS embedding
+
+        // Handle form submission
+        const form = document.getElementById('form');
+        const input = document.getElementById('input');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (input.value) {
+                const message = input.value;
+                socket.emit('message', { username, message });
+                input.value = ''; // Clear the input
+            }
+        });
+
+        // Handle incoming messages
+        const messages = document.getElementById('messages');
+        socket.on('message', (data) => {
+            const item = document.createElement('li');
+            item.classList.add('chat-message');
+            item.innerHTML = `
+                <div class="message-header">${data.username}</div>
+                <div class="message-body">${data.message}</div>
+            `;
+            messages.appendChild(item);
+            messages.scrollTop = messages.scrollHeight; // Scroll to the bottom
+        });
+
+        // WebRTC setup
+        const callButton = document.getElementById('callButton');
+        const hangupButton = document.getElementById('hangupButton');
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        let localStream;
+        let peerConnection;
+
+        const servers = {
+            iceServers: [
+                {
+                    urls: 'stun:stun.l.google.com:19302'
+                }
+            ]
+        };
+
+        callButton.addEventListener('click', async () => {
+            callButton.disabled = true;
+            hangupButton.disabled = false;
+
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            localVideo.srcObject = localStream;
+
+            peerConnection = new RTCPeerConnection(servers);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.onicecandidate = ({ candidate }) => {
+                if (candidate) {
+                    socket.emit('ice-candidate', candidate);
+                }
+            };
+
+            peerConnection.ontrack = (event) => {
+                remoteVideo.srcObject = event.streams[0];
+            };
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('offer', offer);
+        });
+
+        hangupButton.addEventListener('click', () => {
+            peerConnection.close();
+            peerConnection = null;
+            hangupButton.disabled = true;
+            callButton.disabled = false;
+            localVideo.srcObject = null;
+            remoteVideo.srcObject = null;
+            socket.emit('hangup');
+        });
+
+        socket.on('offer', async (offer) => {
+            if (!peerConnection) {
+                peerConnection = new RTCPeerConnection(servers);
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+                peerConnection.onicecandidate = ({ candidate }) => {
+                    if (candidate) {
+                        socket.emit('ice-candidate', candidate);
+                    }
+                };
+
+                peerConnection.ontrack = (event) => {
+                    remoteVideo.srcObject = event.streams[0];
+                };
+            }
+
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            socket.emit('answer', answer);
+        });
+
+        socket.on('answer', async (answer) => {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        });
+
+        socket.on('ice-candidate', async (candidate) => {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (e) {
+                console.error('Error adding received ice candidate', e);
+            }
+        });
+
+        socket.on('hangup', () => {
+            peerConnection.close();
+            peerConnection = null;
+            hangupButton.disabled = true;
+            callButton.disabled = false;
+            localVideo.srcObject = null;
+            remoteVideo.srcObject = null;
+        });
+    </script>
+</body>
+</html>
+<footer class="text-center mt-4">
+  <p>&copy; 2024 Chat App. A Tan Production. All rights reserved.</p>
+</footer>
