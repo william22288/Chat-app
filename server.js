@@ -119,28 +119,28 @@ app.get('/', authenticateToken, (req, res) => {
 // Event handler for new connections
 // Socket.io connection
 io.on('connection', (socket) => {
-    console.log('New client connected');
-  
-    socket.on('message', (data) => {
-      console.log('message: ', data);
-      io.emit('message', data);
-    });
-  
-    socket.on('offer', (offer) => {
-      socket.broadcast.emit('offer', offer);
-    });
-  
-    socket.on('answer', (answer) => {
-      socket.broadcast.emit('answer', answer);
-    });
-  
-    socket.on('ice-candidate', (candidate) => {
-      socket.broadcast.emit('ice-candidate', candidate);
-    });
-  
-    socket.on('disconnect', () => {
-      console.log('Client disconnected');
-    });
+  console.log('New client connected');
+
+  socket.on('message', (data) => {
+    console.log('message: ', data);
+    io.emit('message', data);
   });
+
+  socket.on('offer', (offer) => {
+    socket.broadcast.emit('offer', offer);
+  });
+
+  socket.on('answer', (answer) => {
+    socket.broadcast.emit('answer', answer);
+  });
+
+  socket.on('ice-candidate', (candidate) => {
+    socket.broadcast.emit('ice-candidate', candidate);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected');
+  });
+});
 
 server.listen(8080, () => console.log('Server running on port 8080'));
