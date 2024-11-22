@@ -65,7 +65,8 @@ app.post('/tan/login', async (req, res) => {
     try {
         const user = await User.findByUsername(username);
         if (!user || !await bcrypt.compare(password, user.password)) {
-            return res.status(401).send('Invalid username or password');
+          return res.render('invalid-data');
+            
         }
 
         const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
